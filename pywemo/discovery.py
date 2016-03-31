@@ -1,9 +1,9 @@
 """
 Module to discover WeMo devices.
 """
+from netdisco import ssdp
 import requests
 
-from . import ssdp
 from .ouimeaux_device.bridge import Bridge
 from .ouimeaux_device.insight import Insight
 from .ouimeaux_device.lightswitch import LightSwitch
@@ -16,18 +16,26 @@ from .ouimeaux_device.api.xsd import device as deviceParser
 def discover_devices(st=None, max_devices=None, match_mac=None):
     """ Finds WeMo devices on the local network. """
     st = st or ssdp.ST_ROOTDEVICE
-    ssdp_entries = ssdp.scan(st, max_entries=max_devices, match_mac=match_mac)
 
+    entries = ssdp.scan(st)
     wemos = []
 
-    for entry in ssdp_entries:
-        if entry.match_device_description(
-                {'manufacturer': 'Belkin International Inc.'}):
-            mac = entry.description.get('device').get('macAddress')
-            device = device_from_description(entry.location, mac)
+    description = dict(manufacture='Belkin International Inc.')
+    if match_mac is not None:
+        description['macAddress'] = match_mac
 
-            if device is not None:
-                wemos.append(device)
+    for entry in entries:
+        if not entry.match_device_description(description):
+            continue
+
+        mac = entry.description.get('device').get('macAddress')
+        device = device_from_description(entry.location, mac)
+        if not device:
+            continue
+
+        wemos.append(device)
+        if max_devices and len(wemos) == max_devices:
+            break
 
     return wemos
 
